@@ -1,0 +1,78 @@
+{
+  "type": "supervised",
+  "project": "beam-me-straighty",
+  "checkpoint_mode": "min",
+  "checkpoint_metric": "ABD",
+  "checkpoint_n_saved": 3,
+  "log_interval": "epoch_completed",
+  "amp": true,
+  "batch_size": 64,
+  "loader_workers": 8,
+  "max_epochs": 200,
+  "gradient_accumulation_steps": 1,
+  "clip_grad_norm": 1.0,
+  "datasets": {
+    "train": {
+      "class_name": "datasets.dataset.BaseDataset",
+      "params": {
+        "dataframe_path": ["data/interior/ps-straighten-ok-train-interior.csv", "data/interior/ps-straighten-ok-august-2024-interior.csv"],
+        "max_edge": 768,
+        "n_bins": 301,
+        "bin_max": 150,
+        "clamp_to_range": false,
+        "augment": true,
+        "normalize": true
+      }
+    },
+    "val": {
+      "class_name": "datasets.dataset.BaseDataset",
+      "params": {
+        "dataframe_path": "data/interior/ps-straighten-ok-val-interior.csv",
+        "max_edge": 768,
+        "n_bins": 301,
+        "bin_max": 150,
+        "clamp_to_range": false,
+        "augment": false,
+        "normalize": true
+      }
+    }
+  },
+  "loaders": {},
+  "model": {
+    "class_name": "models.models.AutoRegressiveModel",
+    "params": {
+      "dim": 256,
+      "num_heads": 4,
+      "n_blocks": 8,
+      "with_pos_embeddings": true,
+      "discretized_space": 301
+    }
+  },
+  "losses": {
+    "CE": {
+        "class_name": "torch.nn.CrossEntropyLoss",
+        "params": {
+        },
+        "weight": 1.0
+    }
+  },
+  "metrics": {
+    "ABD": {
+      "class_name": "metrics.abd.AbsoluteBinDistance",
+      "params": {}
+    }
+  },
+  "optimizer": {
+    "class_name": "torch.optim.AdamW",
+    "params": {}
+  },
+  "lr_scheduler": {
+    "type": "cosine",
+    "start_value": 0.0003,
+    "end_value": 1e-7,
+    "cycles": 1,
+    "start_value_mult": 1.0,
+    "end_value_mult": 1.0,
+    "warmup_steps": 0
+  }
+}

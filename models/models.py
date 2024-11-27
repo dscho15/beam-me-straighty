@@ -134,7 +134,7 @@ class AutoRegressiveModel(torch.nn.Module):
                  n_blocks: int = 8,
                  n_tokens: int = 8,
                  with_pos_embeddings: bool = True,
-                 discretized_space: int = 300,
+                 discretized_space: int = 301,
         ):
 
         super(AutoRegressiveModel, self).__init__()
@@ -197,6 +197,7 @@ if __name__ == "__main__":
 
     x = torch.randn(1, 3, 336, 336)
 
-    arm(x)
+    out = arm(x)
+    print(out.shape)
     
     print(count_parameters(arm))
