@@ -6,12 +6,14 @@ from transformers import Dinov2Model
 from timm.models.vision_transformer import LayerScale, DropPath, Mlp
 from timm.models.vision_transformer import Block as MHSABlock
 
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 class MHCABlock(torch.nn.Module):
 
     def __init__(
         self,
-        dim: int = 386,
+        dim: int = 384,
         num_heads: int = 2,
         init_values: float = 1e-3,
         drop_path: float = 0.1,
@@ -94,16 +96,17 @@ class DinoFeaturePyramid(torch.nn.Module):
 class AutoRegressiveModel(torch.nn.Module):
 
     def __init__(self, 
-                 dim: int = 384, 
+                 dim: int = 256, 
                  num_heads: int = 4, 
                  n_blocks: int = 8,
                  n_tokens: int = 8,
-                 discretized_space: int = 8,
+                 discretized_space: int = 300,
         ):
 
         super(AutoRegressiveModel, self).__init__()
 
         self.backbone = DinoFeaturePyramid()
+        self.proj_dino_features = torch.nn.Linear(384, dim)
 
         self.MHSA_blocks = torch.nn.ModuleList(
             [MHSABlock(dim=dim, 
@@ -123,7 +126,8 @@ class AutoRegressiveModel(torch.nn.Module):
     def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
 
         features = self.backbone(x)
-        features = einops.rearrange(features, "b h w c -> b (h w) c")    
+        features = einops.rearrange(features, "b h w c -> b (h w) c")
+        features = self.proj_dino_features(features)
 
         tokens = self.tokens.unsqueeze(0).repeat(features.shape[0], 1, 1)
 
@@ -146,4 +150,4 @@ if __name__ == "__main__":
 
     arm(x)
     
-    print(sum(p.numel() for p in arm.parameters()))
+    print(count_parameters(arm))
