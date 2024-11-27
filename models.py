@@ -126,7 +126,9 @@ class AutoRegressiveModel(torch.nn.Module):
     def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
 
         features = self.backbone(x)
+        
         features = einops.rearrange(features, "b h w c -> b (h w) c")
+        
         features = self.proj_dino_features(features)
 
         tokens = self.tokens.unsqueeze(0).repeat(features.shape[0], 1, 1)

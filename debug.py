@@ -45,4 +45,10 @@ if __name__ == "__main__":
     grid = np.stack([grid_h.ravel(), grid_w.ravel()], axis=0)  # Shape: (2, H*W)
     
     # Generate positional embeddings
-    embeddings = get_2d_sincos_pos_embed_from_grid(64, grid)
+    embeddings = get_2d_sincos_pos_embed_from_grid(8, grid)
+    
+    # plot the embeddings with matplotlib
+    import matplotlib.pyplot as plt
+    
+    plt.imshow(embeddings, aspect='auto')
+    plt.savefig('positional_embeddings.png')
