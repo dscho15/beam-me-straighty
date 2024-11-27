@@ -152,7 +152,7 @@ class BaseDataset(Dataset):
         bin_indices = (offsets - min_value) / (max_value - min_value) * self.n_bins
         bin_indices = torch.round(bin_indices).long()
 
-        if bin_indices.min() < 0 and bin_indices.max() > self.n_bins - 1:
+        if bin_indices.min() < 0 or bin_indices.max() > self.n_bins - 1:
             if self.clamp_to_range:
                 bin_indices = bin_indices.clamp(0, self.n_bins - 1)
             else:
