@@ -142,8 +142,7 @@ class ARStraighter(torch.nn.Module):
             tokens = self.pos_emb_mlp(tokens)
 
         # extract dino features
-        with torch.no_grad():
-            feats = self.backbone(image)
+        feats = self.backbone(image)
 
         feats = einops.rearrange(feats, "b h w c -> b (h w) c")
 
