@@ -4,11 +4,6 @@ from torch import nn
 
 from transformers import Dinov2Model
 
-from timm.models.vision_transformer import LayerScale, DropPath, Mlp
-
-from models.utils.rope2d import RoPE2D
-from models.utils.rope1d import RoPE1D
-
 from models.utils.cross_attention import MHCABlock
 from models.utils.self_attention import MHSABlock1D
 
