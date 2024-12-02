@@ -111,6 +111,8 @@ class ARStraighter(torch.nn.Module):
 
         self.with_pos_embeddings = with_pos_embeddings
         self.pos_emb_mlp = nn.Linear(dim, dim)
+        
+        self.start_token = torch.nn.Parameter(torch.randn(1, 1, dim))
 
     def forward(
         self, x: tuple[torch.FloatTensor, torch.FloatTensor]
@@ -126,10 +128,10 @@ class ARStraighter(torch.nn.Module):
 
         # check num of tokens
         b, n, _ = tokens.shape
-
-        # embed tokens
-        tokens = self.embed_tokens(tokens)
-
+        
+        tokens = self.embed_tokens(tokens).repeat(b, 1, 1)
+        tokens = torch.cat([self.start_token, tokens], dim=1)[:,:-1,:]
+        
         if self.abs_pos_emb:
             tokens += get_1d_sincos_pos_embed_from_grid(
                 tokens.size(-1), torch.arange(n)
