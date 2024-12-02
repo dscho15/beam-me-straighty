@@ -81,6 +81,7 @@ class ARStraighter(torch.nn.Module):
         n_tokens: int = 8,
         with_pos_embeddings: bool = True,
         discretized_space: int = 301,
+        token_input_dim: int = 1
     ):
 
         super(ARStraighter, self).__init__()
@@ -103,8 +104,10 @@ class ARStraighter(torch.nn.Module):
         self.output_tokens = torch.nn.Linear(dim, discretized_space)
         torch.nn.init.normal_(self.output_tokens.weight, std=0.02)
 
+        self.token_input_dim = token_input_dim
+        
         self.embed_tokens = torch.nn.Sequential(
-            torch.nn.Linear(1, dim // 2),
+            torch.nn.Linear(token_input_dim, dim // 2),
             torch.nn.SiLU(),
             torch.nn.Linear(dim // 2, dim),
         )
@@ -129,12 +132,17 @@ class ARStraighter(torch.nn.Module):
         # check num of tokens
         b, n, _ = tokens.shape
         
-        tokens = self.embed_tokens(tokens).repeat(b, 1, 1)
-        tokens = torch.cat([self.start_token, tokens], dim=1)[:,:-1,:]
+        tokens = self.embed_tokens(tokens)
+        
+        start_token = self.start_token.repeat(b, 1, 1)
+        
+        tokens = torch.cat([start_token, tokens], dim=1)[:,:-1,:]
+        
+        token_hidden_dim = tokens.size(-1)
         
         if self.abs_pos_emb:
             tokens += get_1d_sincos_pos_embed_from_grid(
-                tokens.size(-1), torch.arange(n)
+                token_hidden_dim, torch.arange(n)
             )
             tokens = self.pos_emb_mlp(tokens)
 
