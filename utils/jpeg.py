@@ -2,9 +2,8 @@ import torch
 from torchvision import io
 from torchvision.transforms.functional import convert_image_dtype
 
-def jpeg_compression(x: torch.Tensor, 
-                     min_quality: int = 70,
-                     max_quality: int = 100):
+
+def jpeg_compression(x: torch.Tensor, min_quality: int = 70, max_quality: int = 100):
     batch = x.ndim > 3
     if batch:
         x = x.squeeze(0)
@@ -16,8 +15,11 @@ def jpeg_compression(x: torch.Tensor,
         x = x.unsqueeze(0)
     return x
 
+
 class JPEGCompression(torch.nn.Module):
-    def __init__(self, min_quality: int = 70, max_quality: int = 100, probability: float = 1.0):
+    def __init__(
+        self, min_quality: int = 70, max_quality: int = 100, probability: float = 1.0
+    ):
         super().__init__()
         self.min_quality = min_quality
         self.max_quality = max_quality
@@ -28,7 +30,8 @@ class JPEGCompression(torch.nn.Module):
             return jpeg_compression(x, self.min_quality, self.max_quality)
         return x
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     from utils.save import save_image
 
     img = io.read_image("./input.jpg").unsqueeze(0) / 255.0

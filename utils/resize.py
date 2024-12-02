@@ -1,5 +1,6 @@
 from torchvision.transforms.functional import resize, InterpolationMode
 
+
 def resize_max_edge(
     image,
     size: int,

@@ -5,6 +5,7 @@ from transformers import Dinov2Model
 
 from timm.models.vision_transformer import LayerScale, DropPath, Mlp
 from timm.models.vision_transformer import Block as MHSABlock
+from models.utils.cross_attention import MHCABlock
 
 
 def count_parameters(model):
@@ -43,66 +44,6 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     emb = torch.concatenate([emb_sin, emb_cos], axis=1)  # (M, D)
 
     return emb
-
-
-class MHCABlock(torch.nn.Module):
-
-    def __init__(
-        self,
-        dim: int = 384,
-        num_heads: int = 2,
-        init_values: float = 1e-3,
-        drop_path: float = 0.1,
-        mlp_ratio: int = 2,
-        act_layer: torch.nn.Module = torch.nn.GELU,
-        proj_drop: float = 0.1,
-    ):
-        super(MHCABlock, self).__init__()
-
-        self.att = torch.nn.MultiheadAttention(dim, num_heads, batch_first=True)
-
-        self.norm_cross_domain = torch.nn.LayerNorm(dim)
-
-        self.norm1 = torch.nn.LayerNorm(dim)
-
-        self.ls1 = (
-            LayerScale(dim, init_values=init_values)
-            if init_values
-            else torch.nn.Identity()
-        )
-
-        self.drop_path1 = (
-            DropPath(drop_path) if drop_path > 0.0 else torch.nn.Identity()
-        )
-
-        self.mlp = Mlp(
-            in_features=dim,
-            hidden_features=int(dim * mlp_ratio),
-            act_layer=act_layer,
-            drop=proj_drop,
-        )
-
-        self.norm2 = torch.nn.LayerNorm(dim)
-
-        self.ls2 = (
-            LayerScale(dim, init_values=init_values)
-            if init_values
-            else torch.nn.Identity()
-        )
-
-        self.drop_path2 = (
-            DropPath(drop_path) if drop_path > 0.0 else torch.nn.Identity()
-        )
-
-    def forward(self, x: torch.FloatTensor, y: torch.FloatTensor) -> torch.FloatTensor:
-
-        x = x + self.drop_path1(
-            self.ls1(self.att(query=self.norm1(x), key=y, value=y)[0])
-        )
-
-        x = x + self.drop_path2(self.ls2(self.mlp(self.norm2(x))))
-
-        return x
 
 
 class DinoFeaturePyramid(torch.nn.Module):
@@ -172,9 +113,11 @@ class DETRStraighter(torch.nn.Module):
         tokens = self.tokens.unsqueeze(0).repeat(features.shape[0], 1, 1)
 
         if self.with_pos_embeddings:
+
             grid_h, grid_w = torch.meshgrid(
                 torch.arange(2), torch.arange(2), indexing="ij"
             )
+            
             grid = torch.stack(
                 [grid_h.ravel(), grid_w.ravel()], axis=0
             )  # Shape: (2, H*W)
@@ -199,7 +142,7 @@ class DETRStraighter(torch.nn.Module):
 
 if __name__ == "__main__":
 
-    arm = AutoRegressiveModel()
+    arm = DETRStraighter()
 
     x = torch.randn(1, 3, 336, 336)
 
