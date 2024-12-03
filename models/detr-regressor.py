@@ -201,14 +201,16 @@ class DETRStraighter(torch.nn.Module):
             points1 = self.fixed_positions.unsqueeze(0).repeat(tokens.shape[0], 1, 1) # b n 2
             points2 = points1 + einops.rearrange(delta_offsets[:, i, ...], "b (n xy) 1 -> b n xy", n=points1.size(1), xy=2)
             
+            # create a grid (0, 1) and (0, 1)
+            grid = torch.tensor(generate_grid(dh, dw )).to(features.device) * 1.0
+            grid = einops.rearrange(grid, "(dh dw) xy -> 1 dh dw xy", dh=dh, dw=dw, xy=2)
+            
             H = kornia.geometry.homography.find_homography_dlt(points1, points2).unsqueeze(1) # (B 1 3 3)
             
-            
+            warped_grid = kornia.geometry.transform.warp_grid(grid, H)
 
             features = einops.rearrange(features, "b (h w) c -> b h w c", h=dh, w=dw)
-        
-        delta_offsets = torch.cumsum(delta_offsets, dim=1)
-        
+                            
         return delta_offsets
     
 if __name__ == "__main__":
