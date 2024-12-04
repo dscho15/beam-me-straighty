@@ -117,8 +117,10 @@ class DETRStraighter(torch.nn.Module):
             grid_h, grid_w = torch.meshgrid(
                 torch.arange(2), torch.arange(2), indexing="ij"
             )
-            
-            grid = torch.stack([grid_h.ravel(), grid_w.ravel()], axis=0)  # Shape: (2, H*W)
+
+            grid = torch.stack(
+                [grid_h.ravel(), grid_w.ravel()], axis=0
+            )  # Shape: (2, H*W)
 
             pos_embeds = get_2d_sincos_pos_embed_from_grid(tokens.shape[-1], grid)
             pos_embeds = pos_embeds.unsqueeze(1).repeat(1, 2, 1)
