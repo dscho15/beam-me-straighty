@@ -151,18 +151,12 @@ class DETRStraighter(torch.nn.Module):
         super(DETRStraighter, self).__init__()
         
         if len(pos_ranges) == 1:
-            
             r = pos_ranges[0]
-            
             pos_ranges_ = []
-            
             for i in range(n_blocks):
                 pos_ranges_.append((r[0] * (0.5)**i, r[1] * (0.5)**i))
-            
             pos_ranges = pos_ranges_
             
-        print(pos_ranges)
-
         assert n_blocks == len(pos_ranges)
         self.backbone = DinoFeaturePyramid()
         self.proj_dino_features = torch.nn.Linear(384, dim)
