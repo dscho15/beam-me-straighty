@@ -163,7 +163,7 @@ class DETRStraighter(torch.nn.Module):
 
         return features, dh, dw
     
-    def homography(self, points1: torch.FloatTensor, points2: torch.FloatTensor, dh: int, dw: int, features: torch.FloatTensor) -> torch.FloatTensor:
+    def warp_grid(self, points1: torch.FloatTensor, points2: torch.FloatTensor, dh: int, dw: int, features: torch.FloatTensor) -> torch.FloatTensor:
         
         H = kornia.geometry.homography.find_homography_dlt(
                 points1, points2
@@ -232,7 +232,7 @@ class DETRStraighter(torch.nn.Module):
                 xy=2,
             )
 
-            warped_grid = self.homography(points1, points2, dh, dw, features)
+            warped_grid = self.warp_grid(points1, points2, dh, dw, features)
             
             dino_features = torch.nn.functional.grid_sample(
                 features, 
