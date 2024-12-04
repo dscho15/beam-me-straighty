@@ -17,7 +17,7 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     if embed_dim % 2 != 0:
         raise ValueError("embed_dim must be divisible by 2")
 
-    omega = torch.arange(embed_dim // 2, dtype=torch.float)
+    omega = torch.arange(embed_dim // 2, dtype=torch.float, device=pos.device)
     omega /= embed_dim / 2.0
     omega = 1.0 / 10000**omega  # (D/2,)
 
@@ -84,6 +84,28 @@ class PosUpdateBlock(torch.nn.Module):
         else:
             return z
 
+class PosUpdateBlockSimple(torch.nn.Module):
+
+    def __init__(self, dim: int, start: float, end: float):
+        super().__init__()
+
+        assert start == -end
+        self.scale = end
+        
+        self.model = torch.nn.Sequential(
+            torch.nn.Linear(dim, 1),
+            torch.nn.Tanh(),
+        )
+
+    def forward(
+        self, x: torch.FloatTensor
+    ) -> torch.FloatTensor:
+
+        x = self.model(x)
+        return x * self.scale
+        
+
+
 
 def generate_grid(
     x_steps: int = 3, y_steps: int = 3, x_range: tuple = (0, 1), y_range: tuple = (0, 1)
@@ -103,7 +125,13 @@ def generate_grid(
     x_values = torch.linspace(x_range[0], x_range[1], x_steps)
     y_values = torch.linspace(y_range[0], y_range[1], y_steps)
 
-    grid = [(x, y) for x in x_values for y in y_values]
+    (gy, gx) = torch.meshgrid(
+            y_values,
+            x_values,
+            indexing="ij",
+    )
+        
+    grid = torch.stack((gx, gy), dim=-1).reshape(-1, 2)
 
     return grid
 
@@ -121,7 +149,21 @@ class DETRStraighter(torch.nn.Module):
         pos_ranges: list = [(-1, 1) for _ in range(8)],
     ):
         super(DETRStraighter, self).__init__()
+        
+        if len(pos_ranges) == 1:
+            
+            r = pos_ranges[0]
+            
+            pos_ranges_ = []
+            
+            for i in range(n_blocks):
+                pos_ranges_.append((r[0] * (0.5)**i, r[1] * (0.5)**i))
+            
+            pos_ranges = pos_ranges_
+            
+        print(pos_ranges)
 
+        assert n_blocks == len(pos_ranges)
         self.backbone = DinoFeaturePyramid()
         self.proj_dino_features = torch.nn.Linear(384, dim)
         self.n_blocks = n_blocks
@@ -142,12 +184,16 @@ class DETRStraighter(torch.nn.Module):
                 torch.nn.Linear(dim, dim),
             )
 
+        # self.PosUpdateBlocks = torch.nn.ModuleList(
+        #     [PosUpdateBlock(dim, start, end, n_bins) for (start, end) in pos_ranges]
+        # )
+        
         self.PosUpdateBlocks = torch.nn.ModuleList(
-            [PosUpdateBlock(dim, start, end, n_bins) for (start, end) in pos_ranges]
+            [PosUpdateBlockSimple(dim, start, end) for (start, end) in pos_ranges]
         )
 
         self.fixed_positions = torch.tensor(
-            generate_grid(n_tokens_row_cols, n_tokens_row_cols, (-1, 1), (-1, 1))
+            generate_grid(n_tokens_row_cols, n_tokens_row_cols, (-1, 1), (-1, 1)) # parameter to specify
         )
 
         self.proj = Mlp(dim, dim, dim)
@@ -163,15 +209,16 @@ class DETRStraighter(torch.nn.Module):
 
         return features, dh, dw
     
-    def warp_grid(self, points1: torch.FloatTensor, points2: torch.FloatTensor, dh: int, dw: int, features: torch.FloatTensor) -> torch.FloatTensor:
-        
+    def warp_grid(self, points1: torch.FloatTensor, points2: torch.FloatTensor, dh: int, dw: int) -> torch.FloatTensor:
+        device = points1.device
+
         H = kornia.geometry.homography.find_homography_dlt(
-                points1, points2
+                points1, points2, solver="svd"
             ).unsqueeze(1)
 
-        (gx, gy) = torch.meshgrid(
-            torch.linspace(-1, 1, dh, device=features.device),
-            torch.linspace(-1, 1, dw, device=features.device),
+        (gy, gx) = torch.meshgrid(
+            torch.linspace(-1, 1, dh, device=device),
+            torch.linspace(-1, 1, dw, device=device),
             indexing="ij",
         )
         
@@ -182,10 +229,12 @@ class DETRStraighter(torch.nn.Module):
         return warped_grid
 
     def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
+        bs = x.size(0)
+        n_tokens = self.tokens.size(0)
 
         features, dh, dw = self.forward_backbone(x)
 
-        tokens = self.tokens.unsqueeze(0).repeat(features.shape[0], 1, 1)
+        tokens = self.tokens.unsqueeze(0).repeat(bs, 1, 1)
 
         if self.with_pos_embeddings:
 
@@ -204,7 +253,7 @@ class DETRStraighter(torch.nn.Module):
             tokens = self.proj_pos_embeddings(tokens)
 
         delta_offsets = torch.zeros(
-            tokens.shape[0], self.n_blocks, tokens.shape[1], 1
+            bs, self.n_blocks, n_tokens, 1
         ).to(tokens.device)
 
         dino_features = features
@@ -218,12 +267,12 @@ class DETRStraighter(torch.nn.Module):
             tokens = mhca(tokens, dino_features)
 
             tokens = mhsa(tokens)
-
-            d_o = pib(tokens)
+            
+            d_o = pib(tokens) 
 
             delta_offsets[:, i, ...] = (d_o if i == 0 else d_o + delta_offsets[:, i - 1, ...])
 
-            points1 = self.fixed_positions.unsqueeze(0).repeat(tokens.shape[0], 1, 1)
+            points1 = self.fixed_positions.unsqueeze(0).repeat(bs, 1, 1).to(tokens.device)
 
             points2 = points1 + einops.rearrange(
                 delta_offsets[:, i, ...],
@@ -232,8 +281,8 @@ class DETRStraighter(torch.nn.Module):
                 xy=2,
             )
 
-            warped_grid = self.warp_grid(points1, points2, dh, dw, features)
-            
+            warped_grid = self.warp_grid(points2, points1, dh, dw)
+                        
             dino_features = torch.nn.functional.grid_sample(
                 features, 
                 warped_grid, 
@@ -247,16 +296,25 @@ class DETRStraighter(torch.nn.Module):
 
             dino_features = self.proj(dino_features)
 
-        return delta_offsets
+        return delta_offsets.squeeze(-1)
 
 
 if __name__ == "__main__":
 
-    m = DETRStraighter(256)
+    m = DETRStraighter(
+        dim=256,
+        n_blocks=8,
+        n_tokens_row_cols=2,
+        pos_ranges=[(-1, 1)]
+    )
+    
     x = torch.randn(1, 3, 224, 224)
+    
     z = m(x)
     
-    print(z)
+    print(z.shape) # (B, n_blocks, n_tokens_row_cols**2 * 2)
+    
+    # print(z)
     
     einops.rearrange(
         torch.arange(6 * 2).unsqueeze(0), "b (n xy) -> b n (xy)", xy=2, n=6

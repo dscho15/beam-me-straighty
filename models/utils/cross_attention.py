@@ -8,8 +8,8 @@ class MHCABlock(torch.nn.Module):
         dim: int = 384,
         num_heads: int = 2,
         init_values: float = 1e-3,
-        drop_path: float = 0.1,
-        mlp_ratio: int = 2,
+        drop_path: float = 0.0,
+        mlp_ratio: int = 4,
         act_layer: torch.nn.Module = torch.nn.GELU,
         proj_drop: float = 0.0,
     ):
