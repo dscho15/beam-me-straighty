@@ -1,0 +1,92 @@
+{
+    "type": "supervised",
+    "project": "beam-me-straighty",
+    "checkpoint_mode": "min",
+    "checkpoint_metric": "MSE",
+    "checkpoint_n_saved": 5,
+    "log_interval": "epoch_completed",
+    "amp": true,
+    "batch_size": 32,
+    "loader_workers": 8,
+    "max_epochs": 200,
+    "gradient_accumulation_steps": 1,
+    "clip_grad_norm": 0.25,
+    "datasets": {
+      "train": {
+        "class_name": "datasets.regression.BaseDataset",
+        "params": {
+          "dataframe_path": ["data/interior/ps-straighten-ok-train-interior.csv", "data/interior/ps-straighten-ok-august-2024-interior.csv"],
+          "max_edge": 224,
+          "normalize_offsets": true,
+          "augment": true,
+          "normalize": true,
+          "mean": [0.485, 0.456, 0.406],
+          "std": [0.229, 0.224, 0.225]
+        }
+      },
+      "val": {
+        "class_name": "datasets.regression.BaseDataset",
+        "params": {
+          "dataframe_path": "data/interior/ps-straighten-ok-val-interior.csv",
+          "max_edge": 224,
+          "normalize_offsets": true,
+          "augment": false,
+          "normalize": true,
+          "mean": [0.485, 0.456, 0.406],
+          "std": [0.229, 0.224, 0.225]
+        }
+      }
+    },
+    "loaders": {},
+    "model": {
+      "class_name": "models.detr-regressor.DETRStraighter",
+      "params": {
+        "dim": 128,
+        "num_heads": 4,
+        "n_blocks": 10,
+        "n_tokens_row_cols": 2,
+        "with_pos_embeddings": true,
+        "pos_ranges": [[-1, 1], [-1, 1], [-0.75, 0.75], [-0.75, 0.75], [-0.5, 0.5], [-0.5, 0.5], [-0.25, 0.25], [-0.25, 0.25], [-0.25, 0.25], [-0.25, 0.25]]
+      }
+    },
+    "losses": {
+      "DiscountedMSE": {
+          "class_name": "losses.discount.DiscountedHuberLoss",
+          "params": {
+            "discount": 0.9,
+            "scale": 112.0
+  
+          },
+          "weight": 1.0
+      }
+    },
+    "metrics": {
+      "MSE": {
+        "class_name": "ignite.metrics.MeanSquaredError",
+        "params": {
+  
+        }
+      },
+      "MAE": {
+        "class_name": "ignite.metrics.MeanAbsoluteError",
+        "params": {
+          
+        }
+      }
+    },
+    "optimizer": {
+      "class_name": "torch.optim.AdamW",
+      "params": {
+        
+      }
+    },
+    "lr_scheduler": {
+      "type": "cosine",
+      "start_value": 8e-6,
+      "end_value": 1e-7,
+      "cycles": 1,
+      "start_value_mult": 1.0,
+      "end_value_mult": 1.0,
+      "warmup_steps": 500
+    }
+  }

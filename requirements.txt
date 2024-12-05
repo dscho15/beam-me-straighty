@@ -2,3 +2,6 @@ transformers
 torch
 torchvision
 black
+matplotlib
+git+https://SimonLarsen@github.com/SimonLarsen/frogbox.git@v0.3.3
+opencv-python
